@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>30秒英语大作战</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #83a4d4, #b6fbff);
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .bubble {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            font-size: 16px;
+            text-align: center;
+            padding: 8px;
+        }
+
+        .chinese {
+            background: #ff7675;
+            color: white;
+        }
+
+        .english {
+            background: #74b9ff;
+            color: white;
+        }
+
+        .info-board {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px 50px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            margin-top: 15px;
+            cursor: pointer;
+            background: #74b9ff;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-board">
+        <div>时间: <span id="time">30</span>秒</div>
+        <div>分数: <span id="score">0</span>分</div>
+    </div>
+    <div class="container" id="gameArea"></div>
+    <div class="game-over" id="gameOver">
+        <h2 id="resultText"></h2>
+        <button onclick="location.reload()">再玩一次</button>
+    </div>
+
+    <script>
+        const vocabulary = [
+            { ch: '葡萄', en: 'grape' },
+            { ch: '西瓜', en: 'watermelon' },
+            { ch: '草莓', en: 'strawberry' },
+            { ch: '柔软的', en: 'soft' },
+            { ch: '粗的', en: 'thick' },
+            { ch: '圆的', en: 'round' },
+            { ch: '那些', en: 'those' },
+            { ch: '紫色', en: 'purple' },
+            { ch: '或者', en: 'or' },
+            { ch: '闻', en: 'smell' },
+            { ch: '尝', en: 'taste' },
+            { ch: '感到', en: 'feel' },
+            { ch: '年轻的', en: 'young' }
+        ];
+
+        class Game {
+            constructor() {
+                this.score = 0;
+                this.timeLeft = 30; // 已修改为30秒
+                this.gameActive = true;
+                this.activeBubble = null;
+                this.bubbles = [];
+                
+                // 确保DOM元素正确获取
+                this.gameArea = document.getElementById('gameArea');
+                this.scoreElement = document.getElementById('score');
+                this.timeElement = document.getElementById('time');
+                this.gameOverBox = document.getElementById('gameOver');
+                this.resultText = document.getElementById('resultText');
+
+                // 初始化验证
+                if (!this.gameArea) {
+                    console.error("无法找到游戏区域元素");
+                    return;
+                }
+
+                this.init();
+            }
+
+            init() {
+                console.log("游戏初始化...");
+                this.generatePairs(5); // 生成5对泡泡
+                this.startGameLoop();
+                this.startTimer();
+                this.bindEvents();
+            }
+
+            generatePairs(count) {
+                console.log(`正在生成 ${count} 对单词泡泡`);
+                for (let i = 0; i < count; i++) {
+                    const word = this.getRandomWord();
+                    this.createBubble(word.ch, 'chinese', word.index);
+                    this.createBubble(word.en, 'english', word.index);
+                }
+            }
+
+            getRandomWord() {
+                const index = Math.floor(Math.random() * vocabulary.length);
+                return { ...vocabulary[index], index };
+            }
+
+            createBubble(text, lang, index) {
+                const bubble = document.createElement('div');
+                bubble.className = `bubble ${lang}`;
+                bubble.textContent = text;
+                bubble.dataset.index = index;
+                bubble.dataset.lang = lang;
+                
+                // 初始位置
+                const x = Math.random() * (window.innerWidth - 120);
+                const y = Math.random() * (window.innerHeight - 120);
+                bubble.style.left = x + 'px';
+                bubble.style.top = y + 'px';
+                
+                this.bubbles.push({
+                    element: bubble,
+                    x: x,
+                    y: y,
+                    speedX: (Math.random() - 0.5) * 2,
+                    speedY: (Math.random() - 0.5) * 2
+                });
+
+                this.gameArea.appendChild(bubble);
+                console.log(`创建泡泡：${text}`);
+            }
+
+            startGameLoop() {
+                const animate = () => {
+                    if (!this.gameActive) return;
+
+                    this.bubbles.forEach(bubble => {
+                        bubble.x += bubble.speedX;
+                        bubble.y += bubble.speedY;
+
+                        // 边界反弹
+                        if (bubble.x < 0 || bubble.x > window.innerWidth - 100) {
+                            bubble.speedX *= -1;
+                        }
+                        if (bubble.y < 0 || bubble.y > window.innerHeight - 100) {
+                            bubble.speedY *= -1;
+                        }
+
+                        bubble.element.style.left = bubble.x + 'px';
+                        bubble.element.style.top = bubble.y + 'px';
+                    });
+
+                    requestAnimationFrame(animate.bind(this));
+                };
+                animate();
+            }
+
+            bindEvents() {
+                this.gameArea.addEventListener('click', (e) => this.handleClick(e));
+                console.log("事件监听器已绑定");
+            }
+
+            handleClick(e) {
+                if (!this.gameActive) return;
+
+                const bubble = e.target.closest('.bubble');
+                if (!bubble) return;
+
+                console.log("点击了泡泡：", bubble.textContent);
+                
+                bubble.style.transform = 'scale(0.9)';
+                
+                if (!this.activeBubble) {
+                    this.activeBubble = bubble;
+                    bubble.style.filter = 'brightness(1.2)';
+                } else {
+                    if (this.checkPair(this.activeBubble, bubble)) {
+                        this.removePair(this.activeBubble, bubble);
+                        this.score += 10;
+                        this.scoreElement.textContent = this.score;
+                        this.checkVictory();
+                    }
+                    this.resetSelection();
+                }
+            }
+
+            checkPair(b1, b2) {
+                return b1.dataset.index === b2.dataset.index && 
+                       b1.dataset.lang !== b2.dataset.lang;
+            }
+
+            removePair(b1, b2) {
+                console.log("移除配对：", b1.textContent, b2.textContent);
+                
+                // 移除DOM元素
+                b1.remove();
+                b2.remove();
+                
+                // 从数组中移除
+                this.bubbles = this.bubbles.filter(b => 
+                    b.element !== b1 && b.element !== b2
+                );
+            }
+
+            checkVictory() {
+                if (this.bubbles.length === 0) {
+                    console.log("游戏胜利！");
+                    this.gameActive = false;
+                    this.showResult('全数配对成功！🎉');
+                }
+            }
+
+            resetSelection() {
+                if (this.activeBubble) {
+                    this.activeBubble.style.filter = 'none';
+                    this.activeBubble.style.transform = 'none';
+                    this.activeBubble = null;
+                }
+            }
+
+            startTimer() {
+                console.log("计时器启动");
+                const timer = setInterval(() => {
+                    this.timeLeft--;
+                    this.timeElement.textContent = this.timeLeft;
+
+                    if (this.timeLeft <= 0) {
+                        clearInterval(timer);
+                        this.gameActive = false;
+                        this.showResult(
+                            this.bubbles.length === 0 
+                            ? '胜利！🎉' 
+                            : '时间到！😅'
+                        );
+                    }
+                }, 1000);
+            }
+
+            showResult(text) {
+                this.gameOverBox.style.display = 'block';
+                this.resultText.textContent = text;
+            }
+        }
+
+        // 启动游戏
+        console.log("正在启动游戏...");
+        new Game();
+    </script>
+</body>
+</html>
